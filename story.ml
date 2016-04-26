@@ -13,6 +13,13 @@ let make dynamic static =
     static_memory = static;
 }
 
+let to_word (high, low) = 256 * high + low
+
+let split_word =
+    let high = (value lsr 8) land 0xFF in
+    let low  = value land 0xFF in
+    (high, low)
+
 let read_byte story address =
   let dynamic_size = Immutable_bytes.size story.dynamic_memory in
   if is_in_range address dynamic_size then
@@ -24,15 +31,14 @@ let read_byte story address =
 let read_word story address =
   let high = read_byte story (address_of_high_byte address) in
   let low = read_byte story (address_of_low_byte address) in
-  256 * high + low
+  to_word (high, low)
 
 let write_byte story address value =
   let dynamic_memory = Immutable_bytes.write_byte story.dynamic_memory address value in
   { story with dynamic_memory }
 
 let write_word story address value =
-  let high = (value lsr 8) land 0xFF in
-  let low = value land 0xFF in
+  let high, low = split_word value in
   let story = write_byte story (address_of_high_byte address) high in
   write_byte story (address_of_low_byte address) low
 
@@ -47,7 +53,7 @@ let load filename =
   else
     let high = dereference_string (address_of_high_byte static_memory_base_offset) file in
     let low = dereference_string (address_of_low_byte static_memory_base_offset) file in
-    let dynamic_length = high * 256 + low in
+    let dynamic_length = to_word (high, low) in
     if dynamic_length > len then
       failwith (Printf.sprintf "%s is not a valid story file" filename)
     else 
